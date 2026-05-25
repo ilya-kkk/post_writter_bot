@@ -71,6 +71,40 @@ select * from subscriptions;
 select * from followup_events;
 ```
 
+## Автомат состояний
+
+```mermaid
+stateDiagram-v2
+    [*] --> START
+    START --> ASK_USER_TYPE: /start
+    ASK_USER_TYPE --> WAIT_SOURCE: выбор сценария
+
+    WAIT_SOURCE --> WAIT_EXAMPLES: пришла только ссылка
+    WAIT_EXAMPLES --> ANALYZING: пришли 3-5 постов
+    WAIT_SOURCE --> ANALYZING: пришел текст/примеры
+
+    ANALYZING --> SHOW_ANALYSIS: профиль ЦА готов
+    SHOW_ANALYSIS --> WAIT_SOURCE: изменить описание
+    SHOW_ANALYSIS --> GENERATING_IDEAS: да, все верно
+
+    GENERATING_IDEAS --> WAIT_IDEA_SELECTION: идеи готовы
+    WAIT_IDEA_SELECTION --> GENERATING_IDEAS: сгенерировать другие
+    WAIT_IDEA_SELECTION --> GENERATING_POST: выбрана идея
+
+    GENERATING_POST --> FREE_POST_SHOWN: бесплатный пост готов
+    FREE_POST_SHOWN --> PAYWALL_SHOWN: показать тарифы
+
+    PAYWALL_SHOWN --> PAYMENT_PENDING: выбран тариф
+    PAYWALL_SHOWN --> PAYWALL_SHOWN: хочу еще 1 пост
+    PAYMENT_PENDING --> WAIT_TARIFF_SELECTION: назад к тарифам
+    WAIT_TARIFF_SELECTION --> PAYMENT_PENDING: выбран тариф
+    PAYMENT_PENDING --> SUBSCRIBED: mock paid
+
+    PAYWALL_SHOWN --> PAYWALL_SHOWN: followup, если нет оплаты
+    PAYWALL_SHOWN --> SUBSCRIBED: оплата отменяет followups
+    SUBSCRIBED --> [*]
+```
+
 ## Fast followup mode
 
 Для ускоренной проверки догрева установите:
