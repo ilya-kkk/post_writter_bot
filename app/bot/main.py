@@ -1,6 +1,10 @@
 import asyncio
 import logging
 
+from aiogram import Bot, Dispatcher
+from aiogram.fsm.storage.redis import RedisStorage
+
+from app.bot.handlers import onboarding, start
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.init_db import init_db
@@ -16,9 +20,15 @@ async def main() -> None:
         while True:
             await asyncio.sleep(3600)
 
-    logger.info("Bot entrypoint is ready; handlers will be wired in later phases")
-    while True:
-        await asyncio.sleep(3600)
+    bot = Bot(settings.bot_token)
+    storage = RedisStorage.from_url(settings.redis_url)
+    dp = Dispatcher(storage=storage)
+    dp.include_router(start.router)
+    dp.include_router(onboarding.router)
+
+    logger.info("Starting bot polling")
+    await bot.delete_webhook(drop_pending_updates=True)
+    await dp.start_polling(bot)
 
 
 if __name__ == "__main__":
