@@ -3,12 +3,14 @@ import logging
 
 from app.core.config import settings
 from app.core.logging import configure_logging
+from app.db.init_db import init_db
 
 logger = logging.getLogger(__name__)
 
 
 async def main() -> None:
     configure_logging()
+    await init_db()
     if not settings.bot_token:
         logger.warning("BOT_TOKEN is empty; bot polling is disabled")
         while True:
