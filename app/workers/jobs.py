@@ -5,12 +5,13 @@ from aiogram import Bot
 from aiogram.exceptions import TelegramBadRequest
 from sqlalchemy import select
 
-from app.bot.keyboards import analysis_confirmation_keyboard, ideas_keyboard
+from app.bot.keyboards import analysis_confirmation_keyboard, ideas_keyboard, tariff_keyboard
 from app.bot.messages import (
     format_audience_profile,
     format_ideas,
     free_post_explanation,
     idea_to_dict,
+    paywall_text,
     profile_to_dict,
 )
 from app.bot.states import UserState
@@ -150,13 +151,14 @@ async def _generate_post(project_id: int, idea_id: int, chat_id: int, progress_m
 
             user = await session.get(User, project.user_id)
             if user:
-                user.current_state = UserState.FREE_POST_SHOWN
+                user.current_state = UserState.PAYWALL_SHOWN
 
             await session.commit()
 
         await _safe_edit(bot, chat_id, progress_message_id, "Пост готов. Отправляю ниже.")
         await _send_long_message(bot, chat_id, text)
         await bot.send_message(chat_id, free_post_explanation())
+        await bot.send_message(chat_id, paywall_text(), reply_markup=tariff_keyboard())
     finally:
         await bot.session.close()
 

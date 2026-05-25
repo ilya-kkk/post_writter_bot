@@ -63,6 +63,39 @@ def free_post_explanation() -> str:
     )
 
 
+def paywall_text() -> str:
+    return (
+        "Выбери тариф, чтобы продолжить.\n\n"
+        "Лайт\n"
+        "1 проект\n"
+        "25 постов в месяц\n"
+        "1790 ₽ / месяц\n\n"
+        "Стандарт\n"
+        "2 проекта\n"
+        "50 постов в месяц\n"
+        "3190 ₽ / месяц"
+    )
+
+
+def payment_created_text(tariff_name: str, amount: int) -> str:
+    return (
+        "Сформирован платеж.\n\n"
+        f"Тариф: {tariff_name}\n"
+        f"Сумма: {amount} ₽\n\n"
+        "MVP-режим:\n"
+        "нажми кнопку ниже, чтобы симулировать успешную оплату."
+    )
+
+
+def subscription_activated_text(projects_limit: int, posts_limit: int) -> str:
+    return (
+        "Оплата получена. Подписка активирована.\n\n"
+        "Доступно:\n"
+        f"— {projects_limit} проект\n"
+        f"— {posts_limit} постов в месяц"
+    )
+
+
 def _bullet_list(items: list[str] | None) -> str:
     values = items or ["требует уточнения"]
     return "\n".join(f"— {item}" for item in values[:5])
