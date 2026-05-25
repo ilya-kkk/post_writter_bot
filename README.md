@@ -25,6 +25,7 @@ curl http://localhost:8000/health
 ```
 
 Если `OPENAI_API_KEY` не задан, бот использует mock LLM-ответы. Это удобно для проверки MVP-воронки без расходов на API.
+Если `BOT_TOKEN` пустой, контейнеры `bot` и `scheduler` стартуют, но polling и отправка followup-сообщений отключаются.
 
 ## Env
 
@@ -50,6 +51,26 @@ curl http://localhost:8000/health
 8. Выберите тариф.
 9. Нажмите `Оплатить / mock paid`.
 
+Проверить таблицы и тарифы:
+
+```bash
+docker compose exec db psql -U postgres -d post_writer_bot -c "\dt"
+docker compose exec db psql -U postgres -d post_writer_bot -c "select * from tariffs;"
+```
+
+Проверить основные таблицы после ручного сценария:
+
+```sql
+select * from users;
+select * from projects;
+select * from audience_profiles;
+select * from ideas;
+select * from posts;
+select * from payments;
+select * from subscriptions;
+select * from followup_events;
+```
+
 ## Fast followup mode
 
 Для ускоренной проверки догрева установите:
@@ -59,3 +80,4 @@ FOLLOWUP_FAST_MODE=true
 ```
 
 В этом режиме followup-сообщения планируются через минуты, а не часы.
+По умолчанию fast-mode использует интервалы 2, 5, 10, 20, 30 и 47 минут.
