@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.states import UserState
 from app.db.models import Payment, Subscription, Tariff, User
+from app.services.followup_service import cancel_followups_for_user
 from app.services.project_service import upsert_user
 
 
@@ -51,6 +52,7 @@ async def activate_mock_payment(session: AsyncSession, payment_id: int, telegram
     payment.status = "paid"
     payment.paid_at = now
     user.current_state = UserState.SUBSCRIBED
+    await cancel_followups_for_user(session, user.id)
 
     existing = await session.scalars(
         select(Subscription).where(Subscription.user_id == user.id, Subscription.status == "active")

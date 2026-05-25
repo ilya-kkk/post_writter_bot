@@ -20,6 +20,7 @@ from app.core.logging import configure_logging
 from app.db.models import AudienceProfile, Idea, Post, Project, User
 from app.db.session import session_factory
 from app.services.audience_analysis import analyze_audience
+from app.services.followup_service import create_followup_events
 from app.services.idea_generation import generate_ideas
 from app.services.post_generation import generate_post
 from app.services.project_service import get_current_ideas
@@ -152,6 +153,7 @@ async def _generate_post(project_id: int, idea_id: int, chat_id: int, progress_m
             user = await session.get(User, project.user_id)
             if user:
                 user.current_state = UserState.PAYWALL_SHOWN
+                await create_followup_events(session, user.id)
 
             await session.commit()
 
