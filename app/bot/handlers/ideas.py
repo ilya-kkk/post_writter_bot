@@ -1,0 +1,1 @@
+"""Idea selection handlers placeholder."""

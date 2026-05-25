@@ -1,0 +1,1 @@
+"""Idea generation service placeholder."""
