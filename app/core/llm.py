@@ -1,4 +1,5 @@
 import json
+import logging
 from pathlib import Path
 from typing import Any
 
@@ -7,6 +8,7 @@ from openai import AsyncOpenAI
 from app.core.config import settings
 
 PROMPTS_DIR = Path(__file__).resolve().parents[1] / "prompts"
+logger = logging.getLogger(__name__)
 
 
 def render_prompt(name: str, **values: str) -> str:
@@ -20,16 +22,20 @@ async def complete_text(prompt: str, temperature: float = 0.7) -> str | None:
     if not settings.openai_api_key:
         return None
 
-    client = AsyncOpenAI(
-        api_key=settings.openai_api_key,
-        base_url=settings.openai_base_url or None,
-    )
-    response = await client.chat.completions.create(
-        model=settings.openai_model,
-        messages=[{"role": "user", "content": prompt}],
-        temperature=temperature,
-    )
-    return response.choices[0].message.content or ""
+    try:
+        client = AsyncOpenAI(
+            api_key=settings.openai_api_key,
+            base_url=settings.openai_base_url or None,
+        )
+        response = await client.chat.completions.create(
+            model=settings.openai_model,
+            messages=[{"role": "user", "content": prompt}],
+            temperature=temperature,
+        )
+        return response.choices[0].message.content or ""
+    except Exception as exc:
+        logger.warning("LLM request failed, falling back to mock response: %s", exc)
+        return None
 
 
 def dumps_for_prompt(value: Any) -> str:
