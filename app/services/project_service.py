@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.bot.states import UserState
-from app.db.models import Project, User
+from app.db.models import Idea, Project, User
 
 LINK_RE = re.compile(r"^(https?://)?(t\.me|telegram\.me)/[A-Za-z0-9_+/.-]+/?$")
 
@@ -65,3 +65,22 @@ async def create_project_from_source(
     session.add(project)
     await session.flush()
     return project
+
+
+async def get_latest_project_for_tg_user(session: AsyncSession, telegram_id: int) -> Project | None:
+    return await session.scalar(
+        select(Project)
+        .join(User, User.id == Project.user_id)
+        .where(User.telegram_id == telegram_id)
+        .order_by(Project.id.desc())
+        .limit(1)
+    )
+
+
+async def get_current_ideas(session: AsyncSession, project_id: int, limit: int = 6) -> list[Idea]:
+    latest = (
+        await session.scalars(
+            select(Idea).where(Idea.project_id == project_id).order_by(Idea.id.desc()).limit(limit)
+        )
+    ).all()
+    return sorted(latest, key=lambda idea: idea.id)

@@ -4,7 +4,7 @@ import logging
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.redis import RedisStorage
 
-from app.bot.handlers import onboarding, start
+from app.bot.handlers import callbacks, ideas, onboarding, start
 from app.core.config import settings
 from app.core.logging import configure_logging
 from app.db.init_db import init_db
@@ -25,6 +25,8 @@ async def main() -> None:
     dp = Dispatcher(storage=storage)
     dp.include_router(start.router)
     dp.include_router(onboarding.router)
+    dp.include_router(callbacks.router)
+    dp.include_router(ideas.router)
 
     logger.info("Starting bot polling")
     await bot.delete_webhook(drop_pending_updates=True)

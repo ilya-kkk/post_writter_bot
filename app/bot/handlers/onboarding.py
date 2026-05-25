@@ -10,6 +10,7 @@ from app.services.project_service import (
     set_user_state,
     set_user_type,
 )
+from app.workers.queue import enqueue_analyze_project
 
 router = Router()
 
@@ -93,6 +94,7 @@ async def _save_project_and_ack(
         )
         await session.commit()
 
+    progress = await message.answer("Изучаю материал...")
     await state.update_data(project_id=project.id)
     await state.set_state(BotStates.analyzing)
-    await message.answer("Материал принял. Сейчас подготовлю анализ аудитории.")
+    enqueue_analyze_project(project.id, message.chat.id, progress.message_id)
