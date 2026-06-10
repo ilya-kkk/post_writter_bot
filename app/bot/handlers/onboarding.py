@@ -13,10 +13,17 @@ from app.services.project_service import (
     set_user_state,
     set_user_type,
 )
+from app.services.telegram_client import (
+    TelegramClientConfigError,
+    TelegramClientOperationError,
+    fetch_private_invite_channel_posts,
+    format_client_channel_snapshot_for_analysis,
+)
 from app.services.telegram_public_channel import (
     PublicTelegramChannelError,
     fetch_public_channel_posts,
     format_channel_snapshot_for_analysis,
+    is_private_telegram_link,
 )
 from app.workers.queue import enqueue_analyze_project
 
@@ -57,25 +64,49 @@ async def handle_user_type(callback: CallbackQuery, state: FSMContext) -> None:
 async def handle_source(message: Message, state: FSMContext) -> None:
     text = message.text.strip()
     if is_link_only(text):
+        if is_private_telegram_link(text):
+            progress = await message.answer(
+                "Пробую открыть приватный канал..."
+            )
+            try:
+                snapshot = await fetch_private_invite_channel_posts(text)
+            except (TelegramClientConfigError, TelegramClientOperationError) as exc:
+                logger.info("Private Telegram invite parsing failed for %s: %s", text, exc)
+                await _switch_to_examples(
+                    message,
+                    state,
+                    text,
+                    await _private_channel_fallback_text(exc),
+                    progress_message=progress,
+                )
+                return
+
+            raw_input = format_client_channel_snapshot_for_analysis(snapshot)
+            await _save_project_and_ack(
+                message,
+                state,
+                raw_input=raw_input,
+                source_type="telegram_private_invite",
+                source_value=text,
+                progress_message=progress,
+            )
+            return
+
         progress = await message.answer("Пробую прочитать публичный канал...")
         try:
             snapshot = await fetch_public_channel_posts(text)
         except PublicTelegramChannelError as exc:
             logger.info("Public channel parsing failed for %s: %s", text, exc)
-            await state.update_data(source_link=text)
-            async with session_factory()() as session:
-                await set_user_state(session, message.from_user, UserState.WAIT_EXAMPLES)
-                await session.commit()
-
-            await state.set_state(BotStates.wait_examples)
-            await _safe_edit_or_answer(
-                progress,
+            await _switch_to_examples(
                 message,
+                state,
+                text,
                 "Ссылку принял, но автоматически прочитать посты не получилось.\n\n"
                 "Автопарсинг работает только для открытых публичных каналов "
                 "с адресом вида @channel или https://t.me/channel.\n\n"
                 "Пришли 3–5 постов из этого канала одним сообщением. "
                 "Так я смогу понять стиль, боли аудитории и сделать первый пост.",
+                progress_message=progress,
             )
             return
 
@@ -146,3 +177,55 @@ async def _safe_edit_or_answer(progress: Message, source_message: Message, text:
         return progress
     except TelegramBadRequest:
         return await source_message.answer(text)
+
+
+async def _switch_to_examples(
+    message: Message,
+    state: FSMContext,
+    source_link: str,
+    text: str,
+    *,
+    progress_message: Message | None = None,
+) -> None:
+    await state.update_data(source_link=source_link)
+    async with session_factory()() as session:
+        await set_user_state(session, message.from_user, UserState.WAIT_EXAMPLES)
+        await session.commit()
+
+    await state.set_state(BotStates.wait_examples)
+    if progress_message is None:
+        await message.answer(text)
+        return
+
+    await _safe_edit_or_answer(progress_message, message, text)
+
+
+async def _private_channel_fallback_text(exc: Exception) -> str:
+    base = (
+        "Не получилось автоматически прочитать приватный канал.\n\n"
+        "Если ты подписан на этот канал, пришли 3–5 постов из него одним сообщением. "
+        "Так я смогу понять стиль, боли аудитории и сделать первый пост."
+    )
+    if isinstance(exc, TelegramClientOperationError):
+        if exc.code == "join_request_pending":
+            return (
+                "Отправил заявку на вступление, но доступ к каналу пока не появился.\n\n"
+                "Если заявка подтвердится автоматически, отправь ссылку ещё раз. "
+                "Либо пришли 3–5 постов из канала одним сообщением."
+            )
+        if exc.code == "telegram_client_not_authorized":
+            return (
+                "Не получилось автоматически открыть приватный канал.\n\n"
+                "Пришли 3–5 постов из канала одним сообщением."
+            )
+        if exc.code == "unsupported_private_link":
+            return (
+                "Это приватная ссылка Telegram, но в ней нет invite-кода для вступления.\n\n"
+                "Пришли invite-ссылку вида https://t.me/+... или 3–5 постов из канала одним сообщением."
+            )
+        if exc.code == "invalid_invite_link":
+            return (
+                "Telegram не принял invite-ссылку: она может быть устаревшей или отозванной.\n\n"
+                "Пришли новую invite-ссылку или 3–5 постов из канала одним сообщением."
+            )
+    return base

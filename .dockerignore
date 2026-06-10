@@ -1,5 +1,6 @@
 .env
 tmp/
+telegram_client_data/
 .git/
 __pycache__/
 .pytest_cache/

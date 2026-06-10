@@ -1,5 +1,8 @@
 .env
 tmp/
+telegram_client_data/
+*.session
+*.session-journal
 *.dump
 *.backup
 __pycache__/

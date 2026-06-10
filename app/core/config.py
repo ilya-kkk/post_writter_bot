@@ -14,6 +14,12 @@ class Settings(BaseSettings):
     openai_model: str = "gpt-4o-mini"
     openai_timeout_seconds: float = 60.0
     telegram_timeout_seconds: float = 30.0
+    telegram_client_api_id: str = ""
+    telegram_client_api_hash: str = ""
+    telegram_client_data_dir: str = "telegram_client_data"
+    telegram_client_session_name: str = "post_writer_client"
+    telegram_client_admin_token: str = ""
+    telegram_client_timeout_seconds: float = 10.0
     analyze_job_timeout_seconds: int = 360
     generate_ideas_job_timeout_seconds: int = 240
     generate_post_job_timeout_seconds: int = 360

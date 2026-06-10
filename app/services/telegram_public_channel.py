@@ -75,6 +75,30 @@ def normalize_public_channel_username(value: str) -> str | None:
     return username if CHANNEL_USERNAME_RE.match(username) else None
 
 
+def is_private_telegram_link(value: str) -> bool:
+    raw_value = value.strip()
+    if raw_value.startswith("@"):
+        return False
+
+    url_value = raw_value if "://" in raw_value else f"https://{raw_value}"
+    parsed = urlparse(url_value)
+    host = (parsed.netloc or "").lower()
+    if host not in {"t.me", "telegram.me", "www.t.me", "www.telegram.me"}:
+        return False
+
+    parts = [part for part in parsed.path.split("/") if part]
+    if not parts:
+        return False
+
+    if parts[0] == "s":
+        parts = parts[1:]
+
+    if not parts:
+        return False
+
+    return parts[0].startswith("+") or parts[0] in {"c", "joinchat"}
+
+
 async def fetch_public_channel_posts(
     channel_link: str,
     *,

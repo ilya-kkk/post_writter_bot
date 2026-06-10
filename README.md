@@ -24,6 +24,12 @@ API healthcheck:
 curl http://localhost:8000/health
 ```
 
+Telegram client API для входа user-аккаунтом Telethon:
+
+```bash
+curl http://localhost:8010/health
+```
+
 Если `OPENAI_API_KEY` не задан, бот использует mock LLM-ответы. Это удобно для проверки MVP-воронки без расходов на API.
 Если `BOT_TOKEN` пустой, контейнеры `bot` и `scheduler` стартуют, но polling и отправка followup-сообщений отключаются.
 
@@ -36,9 +42,53 @@ curl http://localhost:8000/health
 - `OPENAI_API_KEY` - ключ OpenAI или совместимого API.
 - `OPENAI_BASE_URL` - опциональный base URL для OpenAI-compatible endpoint.
 - `OPENAI_MODEL` - модель, по умолчанию `gpt-4o-mini`.
+- `TELEGRAM_CLIENT_API_ID` - API ID из `my.telegram.org` для Telethon user-клиента.
+- `TELEGRAM_CLIENT_API_HASH` - API hash из `my.telegram.org`.
+- `TELEGRAM_CLIENT_DATA_DIR` - директория для Telethon session-файла, в Docker по умолчанию `/app/telegram_client_data`.
+- `TELEGRAM_CLIENT_SESSION_NAME` - имя session-файла, по умолчанию `post_writer_client`.
+- `TELEGRAM_CLIENT_ADMIN_TOKEN` - опциональный токен для `X-Admin-Token` на login-ручках.
 - `FOLLOWUP_FAST_MODE` - `true` включает короткие интервалы догрева для тестов.
 - `MOCK_PAYMENTS` - `true` включает mock-оплаты.
 - `APP_ENV` - окружение, по умолчанию `local`.
+
+## Вход Telegram user-аккаунтом
+
+Сервис `telegram-client-api` поднимается на `http://localhost:8010`. Swagger доступен на `http://localhost:8010/docs`.
+
+Перед входом заполните в `.env`:
+
+```env
+TELEGRAM_CLIENT_API_ID=123456
+TELEGRAM_CLIENT_API_HASH=0123456789abcdef0123456789abcdef
+TELEGRAM_CLIENT_ADMIN_TOKEN=local-secret
+```
+
+Порядок ручек:
+
+```bash
+curl -H "X-Admin-Token: local-secret" http://localhost:8010/telegram-client/status
+
+curl -X POST http://localhost:8010/telegram-client/send-code \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Token: local-secret" \
+  -d '{"phone":"+79990000000"}'
+
+curl -X POST http://localhost:8010/telegram-client/sign-in \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Token: local-secret" \
+  -d '{"code":"12345"}'
+```
+
+Если ответ `sign-in` вернул `{"status":"password_required"}`, пройдите 2FA:
+
+```bash
+curl -X POST http://localhost:8010/telegram-client/password \
+  -H "Content-Type: application/json" \
+  -H "X-Admin-Token: local-secret" \
+  -d '{"password":"your-2fa-password"}'
+```
+
+Telethon session сохраняется в named volume `telegram_client_data` и переживает перезапуск контейнера. Локальная директория `telegram_client_data/` и файлы `*.session` добавлены в `.gitignore`.
 
 ## Проверка сценария
 

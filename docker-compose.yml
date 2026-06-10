@@ -51,6 +51,23 @@ services:
       redis:
         condition: service_healthy
 
+  telegram-client-api:
+    build: .
+    restart: always
+    command: uvicorn app.telegram_client_api.main:app --host 0.0.0.0 --port 8010
+    environment:
+      APP_ENV: ${APP_ENV:-local}
+      TELEGRAM_CLIENT_API_ID: ${TELEGRAM_CLIENT_API_ID:-}
+      TELEGRAM_CLIENT_API_HASH: ${TELEGRAM_CLIENT_API_HASH:-}
+      TELEGRAM_CLIENT_DATA_DIR: ${TELEGRAM_CLIENT_DATA_DIR:-/app/telegram_client_data}
+      TELEGRAM_CLIENT_SESSION_NAME: ${TELEGRAM_CLIENT_SESSION_NAME:-post_writer_client}
+      TELEGRAM_CLIENT_ADMIN_TOKEN: ${TELEGRAM_CLIENT_ADMIN_TOKEN:-}
+      TELEGRAM_CLIENT_TIMEOUT_SECONDS: ${TELEGRAM_CLIENT_TIMEOUT_SECONDS:-10}
+    ports:
+      - "8010:8010"
+    volumes:
+      - telegram_client_data:/app/telegram_client_data
+
   bot:
     build: .
     restart: always
@@ -66,11 +83,18 @@ services:
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
       OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-60}
       TELEGRAM_TIMEOUT_SECONDS: ${TELEGRAM_TIMEOUT_SECONDS:-30}
+      TELEGRAM_CLIENT_API_ID: ${TELEGRAM_CLIENT_API_ID:-}
+      TELEGRAM_CLIENT_API_HASH: ${TELEGRAM_CLIENT_API_HASH:-}
+      TELEGRAM_CLIENT_DATA_DIR: ${TELEGRAM_CLIENT_DATA_DIR:-/app/telegram_client_data}
+      TELEGRAM_CLIENT_SESSION_NAME: ${TELEGRAM_CLIENT_SESSION_NAME:-post_writer_client}
+      TELEGRAM_CLIENT_TIMEOUT_SECONDS: ${TELEGRAM_CLIENT_TIMEOUT_SECONDS:-10}
       ANALYZE_JOB_TIMEOUT_SECONDS: ${ANALYZE_JOB_TIMEOUT_SECONDS:-360}
       GENERATE_IDEAS_JOB_TIMEOUT_SECONDS: ${GENERATE_IDEAS_JOB_TIMEOUT_SECONDS:-240}
       GENERATE_POST_JOB_TIMEOUT_SECONDS: ${GENERATE_POST_JOB_TIMEOUT_SECONDS:-360}
       FOLLOWUP_FAST_MODE: ${FOLLOWUP_FAST_MODE:-true}
       MOCK_PAYMENTS: ${MOCK_PAYMENTS:-true}
+    volumes:
+      - telegram_client_data:/app/telegram_client_data
     depends_on:
       db:
         condition: service_healthy
@@ -131,3 +155,4 @@ services:
 
 volumes:
   postgres_data:
+  telegram_client_data:
