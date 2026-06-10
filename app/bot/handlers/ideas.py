@@ -3,6 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from app.bot.states import BotStates, UserState
+from app.bot.utils.callbacks import mark_callback_chosen
 from app.db.session import session_factory
 from app.services.project_service import (
     get_current_ideas,
@@ -45,6 +46,7 @@ async def regenerate_ideas(callback: CallbackQuery, state: FSMContext) -> None:
 
     await state.update_data(project_id=project_id)
     await state.set_state(BotStates.generating_ideas)
+    await mark_callback_chosen(callback, "Сгенерировать другие")
     progress = await callback.message.answer("Генерирую другие идеи...")
     enqueue_generate_ideas(project_id, callback.message.chat.id, progress.message_id)
     await callback.answer()
@@ -70,6 +72,7 @@ async def select_idea(callback: CallbackQuery, state: FSMContext) -> None:
 
     await state.update_data(project_id=project_id, idea_id=idea.id)
     await state.set_state(BotStates.generating_post)
+    await mark_callback_chosen(callback, f"Идея {index + 1}")
     progress = await callback.message.answer(
         "Генерирую пост по выбранной идее...\n"
         "Это может занять до минуты."

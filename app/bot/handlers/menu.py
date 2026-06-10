@@ -14,6 +14,7 @@ from app.bot.keyboards import (
 )
 from app.bot.messages import paywall_text, subscription_menu_text, subscription_status_text
 from app.bot.states import BotStates, UserState
+from app.bot.utils.callbacks import mark_callback_chosen
 from app.db.models import AudienceProfile, Idea, Project
 from app.db.session import session_factory
 from app.services.payment_service import get_active_subscription_for_tg_user
@@ -65,18 +66,21 @@ async def status_command(message: Message) -> None:
 
 @router.callback_query(F.data == "menu:projects")
 async def projects_callback(callback: CallbackQuery) -> None:
+    await mark_callback_chosen(callback, "Мои проекты")
     await _show_projects(callback.message, callback.from_user)
     await callback.answer()
 
 
 @router.callback_query(F.data == "menu:new_project")
 async def new_project_callback(callback: CallbackQuery, state: FSMContext) -> None:
+    await mark_callback_chosen(callback, "Создать новый проект")
     await _start_new_project(callback.message, state, callback.from_user)
     await callback.answer()
 
 
 @router.callback_query(F.data == "menu:status")
 async def status_callback(callback: CallbackQuery) -> None:
+    await mark_callback_chosen(callback, "Статус подписки")
     await _show_subscription_status(callback.message, callback.from_user)
     await callback.answer()
 
@@ -84,12 +88,14 @@ async def status_callback(callback: CallbackQuery) -> None:
 @router.callback_query(F.data == "menu:tariffs")
 async def tariffs_callback(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(BotStates.wait_tariff_selection)
+    await mark_callback_chosen(callback, "Тарифы")
     await callback.message.answer(paywall_text(), reply_markup=tariff_keyboard())
     await callback.answer()
 
 
 @router.callback_query(F.data == "menu:back")
 async def back_to_menu_callback(callback: CallbackQuery) -> None:
+    await mark_callback_chosen(callback, "Назад в меню")
     await _show_main_menu(callback.message, callback.from_user)
     await callback.answer()
 
@@ -107,6 +113,7 @@ async def select_project_callback(callback: CallbackQuery, state: FSMContext) ->
 
     await state.update_data(project_id=project.id)
     await state.set_state(BotStates.subscribed)
+    await mark_callback_chosen(callback, _project_title(project))
     await callback.message.answer(
         f"Проект выбран: {_project_title(project)}\n\nЧто делаем дальше?",
         reply_markup=project_actions_keyboard(project.id),
@@ -117,6 +124,7 @@ async def select_project_callback(callback: CallbackQuery, state: FSMContext) ->
 @router.callback_query(F.data.startswith("project:ideas:"))
 async def project_ideas_callback(callback: CallbackQuery, state: FSMContext) -> None:
     project_id = int(callback.data.rsplit(":", 1)[1])
+    await mark_callback_chosen(callback, "Сгенерировать темы")
     await _start_ideas_generation(callback.message, state, callback.from_user, project_id=project_id)
     await callback.answer()
 
@@ -124,6 +132,7 @@ async def project_ideas_callback(callback: CallbackQuery, state: FSMContext) -> 
 @router.callback_query(F.data.startswith("project:custom_topic:"))
 async def custom_topic_callback(callback: CallbackQuery, state: FSMContext) -> None:
     project_id = int(callback.data.rsplit(":", 1)[1])
+    await mark_callback_chosen(callback, "Написать свою тему")
     async with session_factory()() as session:
         subscription = await get_active_subscription_for_tg_user(session, callback.from_user.id)
         project = await set_current_project_for_tg_user(session, callback.from_user.id, project_id)

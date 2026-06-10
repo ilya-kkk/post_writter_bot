@@ -3,6 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
 from app.bot.states import BotStates, UserState
+from app.bot.utils.callbacks import mark_callback_chosen
 from app.db.session import session_factory
 from app.services.project_service import (
     get_latest_project_for_tg_user,
@@ -44,6 +45,7 @@ async def confirm_analysis(callback: CallbackQuery, state: FSMContext) -> None:
 
     await state.update_data(project_id=project_id)
     await state.set_state(BotStates.generating_ideas)
+    await mark_callback_chosen(callback, "Да, всё верно")
     progress = await callback.message.answer("Подбираю идеи для постов...")
     enqueue_generate_ideas(project_id, callback.message.chat.id, progress.message_id)
     await callback.answer()
@@ -56,7 +58,8 @@ async def edit_analysis(callback: CallbackQuery, state: FSMContext) -> None:
         await session.commit()
 
     await state.set_state(BotStates.wait_source)
-    await callback.message.answer("Ок, пришли новое описание ниши или 3–5 примеров постов одним сообщением.")
+    await mark_callback_chosen(callback, "Изменить описание")
+    await callback.message.answer("Ок, пришли новое описание ниши, ссылку или несколько примеров постов.")
     await callback.answer()
 
 

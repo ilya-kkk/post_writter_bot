@@ -5,6 +5,7 @@ from aiogram.types import CallbackQuery
 from app.bot.keyboards import main_menu_reply_keyboard, payment_keyboard, subscription_menu_keyboard, tariff_keyboard
 from app.bot.messages import payment_created_text, paywall_text, subscription_activated_text, subscription_menu_text
 from app.bot.states import BotStates
+from app.bot.utils.callbacks import mark_callback_chosen
 from app.db.session import session_factory
 from app.services.payment_service import activate_mock_payment, create_mock_payment
 
@@ -24,6 +25,7 @@ async def select_tariff(callback: CallbackQuery, state: FSMContext) -> None:
             return
 
     await state.set_state(BotStates.payment_pending)
+    await mark_callback_chosen(callback)
     await callback.message.answer(
         payment_created_text(payment.tariff.name, payment.amount),
         reply_markup=payment_keyboard(payment.id),
@@ -44,6 +46,7 @@ async def mock_paid(callback: CallbackQuery, state: FSMContext) -> None:
             return
 
     await state.set_state(BotStates.subscribed)
+    await mark_callback_chosen(callback, "Оплатить")
     await callback.message.answer(
         subscription_activated_text(subscription.projects_limit, subscription.posts_limit),
         reply_markup=main_menu_reply_keyboard(),
@@ -58,11 +61,13 @@ async def mock_paid(callback: CallbackQuery, state: FSMContext) -> None:
 @router.callback_query(F.data == "payment:back_to_tariffs")
 async def back_to_tariffs(callback: CallbackQuery, state: FSMContext) -> None:
     await state.set_state(BotStates.wait_tariff_selection)
+    await mark_callback_chosen(callback, "Назад к тарифам")
     await callback.message.answer(paywall_text(), reply_markup=tariff_keyboard())
     await callback.answer()
 
 
 @router.callback_query(F.data == "paywall:extra_free")
 async def extra_free_post(callback: CallbackQuery) -> None:
+    await mark_callback_chosen(callback, "Хочу ещё 1 пост")
     await callback.message.answer("Ещё один бесплатный пост доступен после оплаты.")
     await callback.answer()

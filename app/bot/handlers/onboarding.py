@@ -7,6 +7,7 @@ from aiogram.types import CallbackQuery, Message, User as TelegramUser
 
 from app.bot.keyboards import manual_examples_start_keyboard, manual_examples_submit_keyboard
 from app.bot.states import BotStates, UserState
+from app.bot.utils.callbacks import mark_callback_chosen
 from app.db.session import session_factory
 from app.services.project_service import (
     create_project_from_source,
@@ -57,6 +58,7 @@ async def handle_user_type(callback: CallbackQuery, state: FSMContext) -> None:
         _user_for_log(callback.from_user),
         user_type,
     )
+    await mark_callback_chosen(callback, USER_TYPE_LABELS[user_type])
     async with session_factory()() as session:
         await set_user_type(session, callback.from_user, user_type)
         await session.commit()
@@ -269,17 +271,18 @@ async def handle_manual_examples_start(callback: CallbackQuery, state: FSMContex
         callback.message.message_id if callback.message else None,
     )
     if callback.message is not None:
+        await mark_callback_chosen(callback, "Перешлю посты")
         if current_state == BotStates.wait_source.state:
             async with session_factory()() as session:
                 await set_user_state(session, callback.from_user, UserState.WAIT_EXAMPLES)
                 await session.commit()
             await state.set_state(BotStates.wait_examples)
 
-        await state.update_data(manual_examples_status_message_id=callback.message.message_id)
-        await callback.message.edit_text(
+        status_message = await callback.message.answer(
             "Ок, пересылай посты из канала сюда. Я буду собирать текст.\n\n"
             "Когда хватит, нажмёшь «Готово, отправить».",
         )
+        await state.update_data(manual_examples_status_message_id=status_message.message_id)
         if current_state == BotStates.wait_source.state:
             await state.update_data(source_link=None, manual_examples=[])
     await callback.answer()
@@ -318,6 +321,7 @@ async def handle_manual_examples_submit(callback: CallbackQuery, state: FSMConte
         sum(len(example) for example in examples),
         _link_for_log(source_link),
     )
+    await mark_callback_chosen(callback, "Готово, отправить")
     await callback.answer()
     await _save_project_and_ack_for_user(
         callback.message,
@@ -326,7 +330,6 @@ async def handle_manual_examples_submit(callback: CallbackQuery, state: FSMConte
         raw_input=raw_input,
         source_type="telegram_link_examples",
         source_value=source_link,
-        progress_message=callback.message,
     )
 
 
