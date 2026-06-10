@@ -2,8 +2,8 @@ from aiogram import F, Router
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
 
-from app.bot.keyboards import payment_keyboard, tariff_keyboard
-from app.bot.messages import payment_created_text, paywall_text, subscription_activated_text
+from app.bot.keyboards import main_menu_reply_keyboard, payment_keyboard, subscription_menu_keyboard, tariff_keyboard
+from app.bot.messages import payment_created_text, paywall_text, subscription_activated_text, subscription_menu_text
 from app.bot.states import BotStates
 from app.db.session import session_factory
 from app.services.payment_service import activate_mock_payment, create_mock_payment
@@ -45,7 +45,12 @@ async def mock_paid(callback: CallbackQuery, state: FSMContext) -> None:
 
     await state.set_state(BotStates.subscribed)
     await callback.message.answer(
-        subscription_activated_text(subscription.projects_limit, subscription.posts_limit)
+        subscription_activated_text(subscription.projects_limit, subscription.posts_limit),
+        reply_markup=main_menu_reply_keyboard(),
+    )
+    await callback.message.answer(
+        subscription_menu_text(),
+        reply_markup=subscription_menu_keyboard(),
     )
     await callback.answer()
 

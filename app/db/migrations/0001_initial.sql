@@ -5,11 +5,13 @@ CREATE TABLE IF NOT EXISTS users (
     first_name VARCHAR(255),
     current_state VARCHAR(64) NOT NULL DEFAULT 'start',
     user_type VARCHAR(64),
+    current_project_id INTEGER,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
 CREATE INDEX IF NOT EXISTS ix_users_telegram_id ON users (telegram_id);
+CREATE INDEX IF NOT EXISTS ix_users_current_project_id ON users (current_project_id);
 
 CREATE TABLE IF NOT EXISTS projects (
     id SERIAL PRIMARY KEY,
@@ -56,6 +58,7 @@ CREATE TABLE IF NOT EXISTS posts (
     idea_id INTEGER REFERENCES ideas(id) ON DELETE SET NULL,
     text TEXT NOT NULL,
     generation_type VARCHAR(64) NOT NULL DEFAULT 'free',
+    identity_json JSONB NOT NULL DEFAULT '{}'::jsonb,
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 

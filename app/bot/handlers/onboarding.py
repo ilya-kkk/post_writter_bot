@@ -1,4 +1,7 @@
+import logging
+
 from aiogram import F, Router
+from aiogram.exceptions import TelegramBadRequest
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
@@ -10,9 +13,15 @@ from app.services.project_service import (
     set_user_state,
     set_user_type,
 )
+from app.services.telegram_public_channel import (
+    PublicTelegramChannelError,
+    fetch_public_channel_posts,
+    format_channel_snapshot_for_analysis,
+)
 from app.workers.queue import enqueue_analyze_project
 
 router = Router()
+logger = logging.getLogger(__name__)
 
 USER_TYPE_LABELS = {
     "channel": "У меня есть канал",
@@ -48,16 +57,36 @@ async def handle_user_type(callback: CallbackQuery, state: FSMContext) -> None:
 async def handle_source(message: Message, state: FSMContext) -> None:
     text = message.text.strip()
     if is_link_only(text):
-        await state.update_data(source_link=text)
-        async with session_factory()() as session:
-            await set_user_state(session, message.from_user, UserState.WAIT_EXAMPLES)
-            await session.commit()
+        progress = await message.answer("Пробую прочитать публичный канал...")
+        try:
+            snapshot = await fetch_public_channel_posts(text)
+        except PublicTelegramChannelError as exc:
+            logger.info("Public channel parsing failed for %s: %s", text, exc)
+            await state.update_data(source_link=text)
+            async with session_factory()() as session:
+                await set_user_state(session, message.from_user, UserState.WAIT_EXAMPLES)
+                await session.commit()
 
-        await state.set_state(BotStates.wait_examples)
-        await message.answer(
-            "Ссылку принял.\n\n"
-            "Для MVP пришли 3–5 постов из этого канала одним сообщением. "
-            "Так я смогу понять стиль, боли аудитории и сделать первый пост."
+            await state.set_state(BotStates.wait_examples)
+            await _safe_edit_or_answer(
+                progress,
+                message,
+                "Ссылку принял, но автоматически прочитать посты не получилось.\n\n"
+                "Автопарсинг работает только для открытых публичных каналов "
+                "с адресом вида @channel или https://t.me/channel.\n\n"
+                "Пришли 3–5 постов из этого канала одним сообщением. "
+                "Так я смогу понять стиль, боли аудитории и сделать первый пост.",
+            )
+            return
+
+        raw_input = format_channel_snapshot_for_analysis(snapshot)
+        await _save_project_and_ack(
+            message,
+            state,
+            raw_input=raw_input,
+            source_type="telegram_public_link",
+            source_value=snapshot.source_url,
+            progress_message=progress,
         )
         return
 
@@ -77,12 +106,18 @@ async def handle_examples(message: Message, state: FSMContext) -> None:
     )
 
 
+@router.message(BotStates.analyzing, F.text)
+async def handle_message_during_analysis(message: Message) -> None:
+    await message.answer("Уже анализирую предыдущий материал. Дождись результата или нажми /new для нового проекта.")
+
+
 async def _save_project_and_ack(
     message: Message,
     state: FSMContext,
     raw_input: str,
     source_type: str,
     source_value: str | None,
+    progress_message: Message | None = None,
 ) -> None:
     async with session_factory()() as session:
         project = await create_project_from_source(
@@ -94,7 +129,20 @@ async def _save_project_and_ack(
         )
         await session.commit()
 
-    progress = await message.answer("Изучаю материал...")
+    if progress_message is None:
+        progress = await message.answer("Изучаю материал...")
+    else:
+        progress = progress_message
+        progress = await _safe_edit_or_answer(progress, message, "Изучаю материал...")
+
     await state.update_data(project_id=project.id)
     await state.set_state(BotStates.analyzing)
     enqueue_analyze_project(project.id, message.chat.id, progress.message_id)
+
+
+async def _safe_edit_or_answer(progress: Message, source_message: Message, text: str) -> Message:
+    try:
+        await progress.edit_text(text)
+        return progress
+    except TelegramBadRequest:
+        return await source_message.answer(text)

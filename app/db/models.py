@@ -27,6 +27,7 @@ class User(Base, TimestampMixin):
     first_name: Mapped[str | None] = mapped_column(String(255))
     current_state: Mapped[str] = mapped_column(String(64), default="start", nullable=False)
     user_type: Mapped[str | None] = mapped_column(String(64))
+    current_project_id: Mapped[int | None] = mapped_column(Integer)
 
     projects: Mapped[list["Project"]] = relationship(back_populates="user")
     payments: Mapped[list["Payment"]] = relationship(back_populates="user")
@@ -89,6 +90,7 @@ class Post(Base):
     idea_id: Mapped[int | None] = mapped_column(ForeignKey("ideas.id", ondelete="SET NULL"), index=True)
     text: Mapped[str] = mapped_column(Text, nullable=False)
     generation_type: Mapped[str] = mapped_column(String(64), default="free", nullable=False)
+    identity_json: Mapped[dict] = mapped_column(JSONB, nullable=False, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     project: Mapped["Project"] = relationship(back_populates="posts")

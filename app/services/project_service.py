@@ -3,6 +3,7 @@ import re
 from aiogram.types import User as TelegramUser
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.bot.states import UserState
 from app.db.models import Idea, Project, User
@@ -64,6 +65,7 @@ async def create_project_from_source(
     )
     session.add(project)
     await session.flush()
+    user.current_project_id = project.id
     return project
 
 
@@ -75,6 +77,55 @@ async def get_latest_project_for_tg_user(session: AsyncSession, telegram_id: int
         .order_by(Project.id.desc())
         .limit(1)
     )
+
+
+async def get_projects_for_tg_user(session: AsyncSession, telegram_id: int, limit: int = 20) -> list[Project]:
+    return list(
+        await session.scalars(
+            select(Project)
+            .join(User, User.id == Project.user_id)
+            .options(selectinload(Project.audience_profile))
+            .where(User.telegram_id == telegram_id)
+            .order_by(Project.id.desc())
+            .limit(limit)
+        )
+    )
+
+
+async def get_project_for_tg_user(session: AsyncSession, telegram_id: int, project_id: int) -> Project | None:
+    return await session.scalar(
+        select(Project)
+        .join(User, User.id == Project.user_id)
+        .options(selectinload(Project.audience_profile))
+        .where(User.telegram_id == telegram_id, Project.id == project_id)
+        .limit(1)
+    )
+
+
+async def set_current_project_for_tg_user(session: AsyncSession, telegram_id: int, project_id: int) -> Project | None:
+    user = await session.scalar(select(User).where(User.telegram_id == telegram_id))
+    if user is None:
+        return None
+
+    project = await session.scalar(
+        select(Project)
+        .options(selectinload(Project.audience_profile))
+        .where(Project.id == project_id, Project.user_id == user.id)
+        .limit(1)
+    )
+    if project is None:
+        return None
+
+    user.current_project_id = project.id
+    return project
+
+
+async def get_current_project_for_tg_user(session: AsyncSession, telegram_id: int) -> Project | None:
+    user = await session.scalar(select(User).where(User.telegram_id == telegram_id))
+    if user is None or user.current_project_id is None:
+        return None
+
+    return await get_project_for_tg_user(session, telegram_id, user.current_project_id)
 
 
 async def get_current_ideas(session: AsyncSession, project_id: int, limit: int = 6) -> list[Idea]:

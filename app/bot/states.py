@@ -16,6 +16,7 @@ class UserState:
     WAIT_TARIFF_SELECTION = "wait_tariff_selection"
     PAYMENT_PENDING = "payment_pending"
     SUBSCRIBED = "subscribed"
+    WAIT_CUSTOM_TOPIC = "wait_custom_topic"
 
 
 class BotStates(StatesGroup):
@@ -32,3 +33,4 @@ class BotStates(StatesGroup):
     wait_tariff_selection = State()
     payment_pending = State()
     subscribed = State()
+    wait_custom_topic = State()

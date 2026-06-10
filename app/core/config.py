@@ -8,9 +8,15 @@ class Settings(BaseSettings):
     bot_token: str = ""
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/post_writer_bot"
     redis_url: str = "redis://localhost:6379/0"
+    auto_init_db: bool = True
     openai_api_key: str = ""
     openai_base_url: str = ""
     openai_model: str = "gpt-4o-mini"
+    openai_timeout_seconds: float = 60.0
+    telegram_timeout_seconds: float = 30.0
+    analyze_job_timeout_seconds: int = 360
+    generate_ideas_job_timeout_seconds: int = 240
+    generate_post_job_timeout_seconds: int = 360
     followup_fast_mode: bool = True
     mock_payments: bool = True
 

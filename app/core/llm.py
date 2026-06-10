@@ -26,6 +26,8 @@ async def complete_text(prompt: str, temperature: float = 0.7) -> str | None:
         client = AsyncOpenAI(
             api_key=settings.openai_api_key,
             base_url=settings.openai_base_url or None,
+            timeout=settings.openai_timeout_seconds,
+            max_retries=1,
         )
         response = await client.chat.completions.create(
             model=settings.openai_model,

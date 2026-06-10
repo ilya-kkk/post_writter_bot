@@ -2,6 +2,7 @@ import asyncio
 import logging
 
 from aiogram import Bot
+from aiogram.client.session.aiohttp import AiohttpSession
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.core.config import settings
@@ -30,7 +31,7 @@ async def main() -> None:
 
 
 async def process_followups() -> None:
-    bot = Bot(settings.bot_token)
+    bot = Bot(settings.bot_token, session=AiohttpSession(timeout=settings.telegram_timeout_seconds))
     try:
         async with session_factory()() as session:
             events = await get_due_followups(session)

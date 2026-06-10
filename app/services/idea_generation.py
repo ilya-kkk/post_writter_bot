@@ -1,6 +1,9 @@
+import logging
 from typing import Any
 
 from app.core.llm import complete_text, dumps_for_prompt, parse_json_array, render_prompt
+
+logger = logging.getLogger(__name__)
 
 
 async def generate_ideas(audience_profile: dict[str, Any], count: int = 6) -> list[dict[str, str]]:
@@ -13,7 +16,11 @@ async def generate_ideas(audience_profile: dict[str, Any], count: int = 6) -> li
     if response is None:
         return mock_ideas(audience_profile, count)
 
-    ideas = parse_json_array(response)
+    try:
+        ideas = parse_json_array(response)
+    except ValueError as exc:
+        logger.warning("Ideas response is not valid JSON, falling back to mock: %s", exc)
+        return mock_ideas(audience_profile, count)
     normalized = [normalize_idea(item) for item in ideas]
     return normalized[:count] or mock_ideas(audience_profile, count)
 

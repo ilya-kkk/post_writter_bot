@@ -73,3 +73,30 @@ async def activate_mock_payment(session: AsyncSession, payment_id: int, telegram
     session.add(subscription)
     await session.flush()
     return subscription
+
+
+async def get_active_subscription_for_tg_user(session: AsyncSession, telegram_id: int) -> Subscription | None:
+    return await session.scalar(
+        select(Subscription)
+        .join(User, User.id == Subscription.user_id)
+        .where(
+            User.telegram_id == telegram_id,
+            Subscription.status == "active",
+            Subscription.expires_at > datetime.now(UTC),
+        )
+        .order_by(Subscription.id.desc())
+        .limit(1)
+    )
+
+
+async def get_active_subscription_for_user_id(session: AsyncSession, user_id: int) -> Subscription | None:
+    return await session.scalar(
+        select(Subscription)
+        .where(
+            Subscription.user_id == user_id,
+            Subscription.status == "active",
+            Subscription.expires_at > datetime.now(UTC),
+        )
+        .order_by(Subscription.id.desc())
+        .limit(1)
+    )

@@ -11,12 +11,31 @@ def get_queue() -> Queue:
 
 
 def enqueue_analyze_project(project_id: int, chat_id: int, progress_message_id: int) -> None:
-    get_queue().enqueue(jobs.analyze_project_job, project_id, chat_id, progress_message_id)
+    get_queue().enqueue(
+        jobs.analyze_project_job,
+        project_id,
+        chat_id,
+        progress_message_id,
+        job_timeout=settings.analyze_job_timeout_seconds,
+    )
 
 
 def enqueue_generate_ideas(project_id: int, chat_id: int, progress_message_id: int) -> None:
-    get_queue().enqueue(jobs.generate_ideas_job, project_id, chat_id, progress_message_id)
+    get_queue().enqueue(
+        jobs.generate_ideas_job,
+        project_id,
+        chat_id,
+        progress_message_id,
+        job_timeout=settings.generate_ideas_job_timeout_seconds,
+    )
 
 
 def enqueue_generate_post(project_id: int, idea_id: int, chat_id: int, progress_message_id: int) -> None:
-    get_queue().enqueue(jobs.generate_post_job, project_id, idea_id, chat_id, progress_message_id)
+    get_queue().enqueue(
+        jobs.generate_post_job,
+        project_id,
+        idea_id,
+        chat_id,
+        progress_message_id,
+        job_timeout=settings.generate_post_job_timeout_seconds,
+    )

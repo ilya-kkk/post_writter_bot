@@ -1,6 +1,7 @@
 services:
   db:
     image: postgres:16-alpine
+    restart: always
     environment:
       POSTGRES_DB: post_writer_bot
       POSTGRES_USER: postgres
@@ -15,6 +16,7 @@ services:
 
   redis:
     image: redis:7-alpine
+    restart: always
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -23,15 +25,22 @@ services:
 
   api:
     build: .
+    restart: always
     command: uvicorn app.api.main:app --host 0.0.0.0 --port 8000
     environment:
       APP_ENV: ${APP_ENV:-local}
       BOT_TOKEN: ${BOT_TOKEN:-}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/post_writer_bot}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      AUTO_INIT_DB: ${AUTO_INIT_DB:-true}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-60}
+      TELEGRAM_TIMEOUT_SECONDS: ${TELEGRAM_TIMEOUT_SECONDS:-30}
+      ANALYZE_JOB_TIMEOUT_SECONDS: ${ANALYZE_JOB_TIMEOUT_SECONDS:-360}
+      GENERATE_IDEAS_JOB_TIMEOUT_SECONDS: ${GENERATE_IDEAS_JOB_TIMEOUT_SECONDS:-240}
+      GENERATE_POST_JOB_TIMEOUT_SECONDS: ${GENERATE_POST_JOB_TIMEOUT_SECONDS:-360}
       FOLLOWUP_FAST_MODE: ${FOLLOWUP_FAST_MODE:-true}
       MOCK_PAYMENTS: ${MOCK_PAYMENTS:-true}
     ports:
@@ -44,15 +53,22 @@ services:
 
   bot:
     build: .
+    restart: always
     command: python -m app.bot.main
     environment:
       APP_ENV: ${APP_ENV:-local}
       BOT_TOKEN: ${BOT_TOKEN:-}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/post_writer_bot}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      AUTO_INIT_DB: ${AUTO_INIT_DB:-true}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-60}
+      TELEGRAM_TIMEOUT_SECONDS: ${TELEGRAM_TIMEOUT_SECONDS:-30}
+      ANALYZE_JOB_TIMEOUT_SECONDS: ${ANALYZE_JOB_TIMEOUT_SECONDS:-360}
+      GENERATE_IDEAS_JOB_TIMEOUT_SECONDS: ${GENERATE_IDEAS_JOB_TIMEOUT_SECONDS:-240}
+      GENERATE_POST_JOB_TIMEOUT_SECONDS: ${GENERATE_POST_JOB_TIMEOUT_SECONDS:-360}
       FOLLOWUP_FAST_MODE: ${FOLLOWUP_FAST_MODE:-true}
       MOCK_PAYMENTS: ${MOCK_PAYMENTS:-true}
     depends_on:
@@ -63,15 +79,22 @@ services:
 
   worker:
     build: .
+    restart: always
     command: python -m app.workers.worker
     environment:
       APP_ENV: ${APP_ENV:-local}
       BOT_TOKEN: ${BOT_TOKEN:-}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/post_writer_bot}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      AUTO_INIT_DB: ${AUTO_INIT_DB:-true}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-60}
+      TELEGRAM_TIMEOUT_SECONDS: ${TELEGRAM_TIMEOUT_SECONDS:-30}
+      ANALYZE_JOB_TIMEOUT_SECONDS: ${ANALYZE_JOB_TIMEOUT_SECONDS:-360}
+      GENERATE_IDEAS_JOB_TIMEOUT_SECONDS: ${GENERATE_IDEAS_JOB_TIMEOUT_SECONDS:-240}
+      GENERATE_POST_JOB_TIMEOUT_SECONDS: ${GENERATE_POST_JOB_TIMEOUT_SECONDS:-360}
       FOLLOWUP_FAST_MODE: ${FOLLOWUP_FAST_MODE:-true}
       MOCK_PAYMENTS: ${MOCK_PAYMENTS:-true}
     depends_on:
@@ -82,15 +105,22 @@ services:
 
   scheduler:
     build: .
+    restart: always
     command: python -m app.workers.scheduler
     environment:
       APP_ENV: ${APP_ENV:-local}
       BOT_TOKEN: ${BOT_TOKEN:-}
       DATABASE_URL: ${DATABASE_URL:-postgresql+asyncpg://postgres:postgres@db:5432/post_writer_bot}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379/0}
+      AUTO_INIT_DB: ${AUTO_INIT_DB:-true}
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       OPENAI_BASE_URL: ${OPENAI_BASE_URL:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4o-mini}
+      OPENAI_TIMEOUT_SECONDS: ${OPENAI_TIMEOUT_SECONDS:-60}
+      TELEGRAM_TIMEOUT_SECONDS: ${TELEGRAM_TIMEOUT_SECONDS:-30}
+      ANALYZE_JOB_TIMEOUT_SECONDS: ${ANALYZE_JOB_TIMEOUT_SECONDS:-360}
+      GENERATE_IDEAS_JOB_TIMEOUT_SECONDS: ${GENERATE_IDEAS_JOB_TIMEOUT_SECONDS:-240}
+      GENERATE_POST_JOB_TIMEOUT_SECONDS: ${GENERATE_POST_JOB_TIMEOUT_SECONDS:-360}
       FOLLOWUP_FAST_MODE: ${FOLLOWUP_FAST_MODE:-true}
       MOCK_PAYMENTS: ${MOCK_PAYMENTS:-true}
     depends_on:

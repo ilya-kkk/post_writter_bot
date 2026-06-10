@@ -1,0 +1,7 @@
+.env
+tmp/
+.git/
+__pycache__/
+.pytest_cache/
+*.dump
+*.backup

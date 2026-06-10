@@ -92,7 +92,25 @@ def subscription_activated_text(projects_limit: int, posts_limit: int) -> str:
         "Оплата получена. Подписка активирована.\n\n"
         "Доступно:\n"
         f"— {projects_limit} проект\n"
-        f"— {posts_limit} постов в месяц"
+        f"— {posts_limit} постов в месяц\n\n"
+        "Кнопка Меню теперь закреплена рядом с полем ввода."
+    )
+
+
+def subscription_menu_text() -> str:
+    return (
+        "Меню.\n\n"
+        "Можно создать новую тематику, выбрать один из сохранённых проектов или посмотреть лимиты подписки."
+    )
+
+
+def subscription_status_text(posts_used: int, posts_limit: int, projects_limit: int, expires_at: str) -> str:
+    posts_left = max(posts_limit - posts_used, 0)
+    return (
+        "Подписка активна.\n\n"
+        f"Проектов в тарифе: {projects_limit}\n"
+        f"Постов осталось: {posts_left} из {posts_limit}\n"
+        f"Действует до: {expires_at}"
     )
 
 

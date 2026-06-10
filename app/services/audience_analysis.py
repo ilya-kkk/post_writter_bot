@@ -1,6 +1,9 @@
+import logging
 from typing import Any
 
 from app.core.llm import complete_text, parse_json_object, render_prompt
+
+logger = logging.getLogger(__name__)
 
 
 async def analyze_audience(source_material: str) -> dict[str, Any]:
@@ -9,7 +12,11 @@ async def analyze_audience(source_material: str) -> dict[str, Any]:
     if response is None:
         return mock_audience_analysis(source_material)
 
-    data = parse_json_object(response)
+    try:
+        data = parse_json_object(response)
+    except ValueError as exc:
+        logger.warning("Audience analysis response is not valid JSON, falling back to mock: %s", exc)
+        return mock_audience_analysis(source_material)
     return normalize_audience_profile(data)
 
 

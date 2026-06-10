@@ -1,6 +1,6 @@
 import asyncio
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db.models import Base, Tariff
@@ -27,6 +27,11 @@ TARIFFS = [
 async def create_schema() -> None:
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
+        await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS current_project_id INTEGER"))
+        await conn.execute(text("CREATE INDEX IF NOT EXISTS ix_users_current_project_id ON users (current_project_id)"))
+        await conn.execute(
+            text("ALTER TABLE posts ADD COLUMN IF NOT EXISTS identity_json JSONB NOT NULL DEFAULT '{}'::jsonb")
+        )
 
 
 async def seed_tariffs(session: AsyncSession) -> None:
@@ -43,6 +48,11 @@ async def seed_tariffs(session: AsyncSession) -> None:
 
 
 async def init_db() -> None:
+    from app.core.config import settings
+
+    if not settings.auto_init_db:
+        return
+
     await create_schema()
     async with session_factory()() as session:
         await seed_tariffs(session)

@@ -1,0 +1,6 @@
+.env
+tmp/
+*.dump
+*.backup
+__pycache__/
+.pytest_cache/
