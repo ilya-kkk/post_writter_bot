@@ -92,3 +92,19 @@ def project_actions_keyboard(project_id: int) -> InlineKeyboardMarkup:
             [InlineKeyboardButton(text="Создать новый проект", callback_data="menu:new_project")],
         ]
     )
+
+
+def manual_examples_start_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Перешлю посты", callback_data="examples:manual")],
+        ]
+    )
+
+
+def manual_examples_submit_keyboard() -> InlineKeyboardMarkup:
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="Готово, отправить", callback_data="examples:submit")],
+        ]
+    )

@@ -1,5 +1,6 @@
 import asyncio
 import json
+import logging
 import re
 from dataclasses import dataclass
 from pathlib import Path
@@ -31,6 +32,8 @@ DEFAULT_MAX_MATERIAL_CHARS = 12000
 PRIVATE_INVITE_CHECK_ATTEMPTS = 4
 PRIVATE_INVITE_CHECK_DELAY_SECONDS = 1.0
 TELEGRAM_HOSTS = {"t.me", "telegram.me", "www.t.me", "www.telegram.me"}
+
+logger = logging.getLogger(__name__)
 
 
 class TelegramClientConfigError(Exception):
@@ -258,29 +261,65 @@ async def fetch_private_invite_channel_posts(
 ) -> TelegramClientChannelSnapshot:
     invite_hash = extract_private_invite_hash(channel_link)
     if not invite_hash:
+        logger.info(
+            "telegram_client.private_invite.unsupported link=%s",
+            _safe_link_for_log(channel_link),
+        )
         raise TelegramClientOperationError(
             "unsupported_private_link",
             "Эту приватную ссылку нельзя открыть через invite hash",
         )
 
     async with _client_lock:
+        logger.info(
+            "telegram_client.private_invite.start link=%s invite=%s limit=%s",
+            _safe_link_for_log(channel_link),
+            _mask_invite_hash(invite_hash),
+            limit,
+        )
         client = _build_client()
         await client.connect()
         try:
             if not await client.is_user_authorized():
+                logger.info(
+                    "telegram_client.private_invite.not_authorized invite=%s",
+                    _mask_invite_hash(invite_hash),
+                )
                 raise TelegramClientOperationError(
                     "telegram_client_not_authorized",
                     "Telegram user-аккаунт не авторизован",
                 )
 
             chat = await _join_invite_and_get_chat(client, invite_hash)
+            logger.info(
+                "telegram_client.private_invite.joined invite=%s chat_id=%s title=%s broadcast=%s megagroup=%s",
+                _mask_invite_hash(invite_hash),
+                getattr(chat, "id", None),
+                getattr(chat, "title", None),
+                getattr(chat, "broadcast", None),
+                getattr(chat, "megagroup", None),
+            )
             posts = await _fetch_text_posts(client, chat, limit=limit)
             if not posts:
+                logger.info(
+                    "telegram_client.private_invite.no_text_posts invite=%s chat_id=%s title=%s",
+                    _mask_invite_hash(invite_hash),
+                    getattr(chat, "id", None),
+                    getattr(chat, "title", None),
+                )
                 raise TelegramClientOperationError(
                     "no_text_posts",
                     "В канале не нашлось доступных текстовых постов",
                 )
 
+            logger.info(
+                "telegram_client.private_invite.posts_fetched invite=%s chat_id=%s title=%s posts=%s chars=%s",
+                _mask_invite_hash(invite_hash),
+                getattr(chat, "id", None),
+                getattr(chat, "title", None),
+                len(posts),
+                sum(len(post.text) for post in posts),
+            )
             return TelegramClientChannelSnapshot(
                 title=getattr(chat, "title", None) or "Telegram channel",
                 source_url=channel_link,
@@ -289,6 +328,10 @@ async def fetch_private_invite_channel_posts(
             )
         finally:
             await client.disconnect()
+            logger.info(
+                "telegram_client.private_invite.finish invite=%s",
+                _mask_invite_hash(invite_hash),
+            )
 
 
 def format_client_channel_snapshot_for_analysis(
@@ -455,46 +498,109 @@ async def _call_telegram(coro, *, invalid_phone_message: str):
 
 
 async def _join_invite_and_get_chat(client: TelegramClient, invite_hash: str):
+    logger.info("telegram_client.invite.check_before_import invite=%s", _mask_invite_hash(invite_hash))
     try:
         chat = await _check_invite_joined(client, invite_hash)
     except TelegramClientOperationError as exc:
         if exc.code != "invalid_invite_link":
+            logger.info(
+                "telegram_client.invite.check_before_import.failed invite=%s code=%s retry_after=%s",
+                _mask_invite_hash(invite_hash),
+                exc.code,
+                exc.retry_after_seconds,
+            )
             raise
+        logger.info(
+            "telegram_client.invite.check_before_import.invalid invite=%s trying_import=true",
+            _mask_invite_hash(invite_hash),
+        )
         chat = None
     if chat is not None:
+        logger.info(
+            "telegram_client.invite.already_joined invite=%s chat_id=%s title=%s",
+            _mask_invite_hash(invite_hash),
+            getattr(chat, "id", None),
+            getattr(chat, "title", None),
+        )
         return chat
 
+    logger.info("telegram_client.invite.import.start invite=%s", _mask_invite_hash(invite_hash))
     try:
         await client(functions.messages.ImportChatInviteRequest(invite_hash))
     except UserAlreadyParticipantError:
+        logger.info(
+            "telegram_client.invite.import.already_participant invite=%s",
+            _mask_invite_hash(invite_hash),
+        )
         pass
     except InviteRequestSentError:
+        logger.info(
+            "telegram_client.invite.import.request_sent invite=%s",
+            _mask_invite_hash(invite_hash),
+        )
         pass
     except (InviteHashEmptyError, InviteHashExpiredError, InviteHashInvalidError) as exc:
+        logger.info(
+            "telegram_client.invite.import.invalid invite=%s error=%s",
+            _mask_invite_hash(invite_hash),
+            type(exc).__name__,
+        )
         raise TelegramClientOperationError(
             "invalid_invite_link",
             "Telegram не принял invite-ссылку",
         ) from exc
     except (ChannelsTooMuchError, UserChannelsTooMuchError) as exc:
+        logger.info(
+            "telegram_client.invite.import.too_many_channels invite=%s error=%s",
+            _mask_invite_hash(invite_hash),
+            type(exc).__name__,
+        )
         raise TelegramClientOperationError(
             "too_many_channels",
             "Telegram-аккаунт уже состоит в слишком большом количестве каналов",
         ) from exc
     except FloodWaitError as exc:
+        logger.info(
+            "telegram_client.invite.import.flood_wait invite=%s seconds=%s",
+            _mask_invite_hash(invite_hash),
+            exc.seconds,
+        )
         raise TelegramClientOperationError(
             "flood_wait",
             f"Telegram временно ограничил вход. Повторите через {exc.seconds} секунд.",
             retry_after_seconds=exc.seconds,
         ) from exc
     except RPCError as exc:
+        logger.info(
+            "telegram_client.invite.import.rpc_error invite=%s error=%s",
+            _mask_invite_hash(invite_hash),
+            exc,
+        )
         raise TelegramClientOperationError("telegram_rpc_error", str(exc)) from exc
 
-    for _ in range(PRIVATE_INVITE_CHECK_ATTEMPTS):
+    for attempt in range(1, PRIVATE_INVITE_CHECK_ATTEMPTS + 1):
+        logger.info(
+            "telegram_client.invite.check_after_import.start invite=%s attempt=%s",
+            _mask_invite_hash(invite_hash),
+            attempt,
+        )
         chat = await _check_invite_joined(client, invite_hash)
         if chat is not None:
+            logger.info(
+                "telegram_client.invite.check_after_import.joined invite=%s attempt=%s chat_id=%s title=%s",
+                _mask_invite_hash(invite_hash),
+                attempt,
+                getattr(chat, "id", None),
+                getattr(chat, "title", None),
+            )
             return chat
         await asyncio.sleep(PRIVATE_INVITE_CHECK_DELAY_SECONDS)
 
+    logger.info(
+        "telegram_client.invite.join_pending invite=%s attempts=%s",
+        _mask_invite_hash(invite_hash),
+        PRIVATE_INVITE_CHECK_ATTEMPTS,
+    )
     raise TelegramClientOperationError(
         "join_request_pending",
         "Заявка на вступление отправлена, но доступ к каналу пока не появился",
@@ -505,25 +611,68 @@ async def _check_invite_joined(client: TelegramClient, invite_hash: str):
     try:
         invite = await client(functions.messages.CheckChatInviteRequest(invite_hash))
     except (InviteHashEmptyError, InviteHashExpiredError, InviteHashInvalidError) as exc:
+        logger.info(
+            "telegram_client.invite.check.invalid invite=%s error=%s",
+            _mask_invite_hash(invite_hash),
+            type(exc).__name__,
+        )
         raise TelegramClientOperationError(
             "invalid_invite_link",
             "Telegram не принял invite-ссылку",
         ) from exc
     except FloodWaitError as exc:
+        logger.info(
+            "telegram_client.invite.check.flood_wait invite=%s seconds=%s",
+            _mask_invite_hash(invite_hash),
+            exc.seconds,
+        )
         raise TelegramClientOperationError(
             "flood_wait",
             f"Telegram временно ограничил вход. Повторите через {exc.seconds} секунд.",
             retry_after_seconds=exc.seconds,
         ) from exc
     except RPCError as exc:
+        logger.info(
+            "telegram_client.invite.check.rpc_error invite=%s error=%s",
+            _mask_invite_hash(invite_hash),
+            exc,
+        )
         raise TelegramClientOperationError("telegram_rpc_error", str(exc)) from exc
 
     if isinstance(invite, types.ChatInviteAlready):
+        logger.info(
+            "telegram_client.invite.check.already invite=%s chat_id=%s title=%s",
+            _mask_invite_hash(invite_hash),
+            getattr(invite.chat, "id", None),
+            getattr(invite.chat, "title", None),
+        )
         return invite.chat
+    if isinstance(invite, types.ChatInvite):
+        logger.info(
+            "telegram_client.invite.check.preview invite=%s title=%s request_needed=%s broadcast=%s megagroup=%s participants=%s",
+            _mask_invite_hash(invite_hash),
+            invite.title,
+            invite.request_needed,
+            invite.broadcast,
+            invite.megagroup,
+            invite.participants_count,
+        )
+    else:
+        logger.info(
+            "telegram_client.invite.check.not_joined invite=%s type=%s",
+            _mask_invite_hash(invite_hash),
+            type(invite).__name__,
+        )
     return None
 
 
 async def _fetch_text_posts(client: TelegramClient, chat, *, limit: int) -> list[TelegramClientPost]:
+    logger.info(
+        "telegram_client.posts.fetch.start chat_id=%s title=%s limit=%s",
+        getattr(chat, "id", None),
+        getattr(chat, "title", None),
+        limit,
+    )
     posts: list[TelegramClientPost] = []
     async for message in client.iter_messages(chat, limit=max(limit * 3, limit)):
         text = (message.message or "").strip()
@@ -538,6 +687,12 @@ async def _fetch_text_posts(client: TelegramClient, chat, *, limit: int) -> list
         if len(posts) >= limit:
             break
 
+    logger.info(
+        "telegram_client.posts.fetch.finish chat_id=%s title=%s posts=%s",
+        getattr(chat, "id", None),
+        getattr(chat, "title", None),
+        len(posts),
+    )
     return list(reversed(posts))
 
 
@@ -557,3 +712,21 @@ def _serialize_user(user) -> dict[str, Any]:
         "first_name": user.first_name,
         "last_name": user.last_name,
     }
+
+
+def _mask_invite_hash(invite_hash: str | None) -> str:
+    if not invite_hash:
+        return "none"
+    if len(invite_hash) <= 8:
+        return f"{invite_hash[:2]}***{invite_hash[-2:]}(len={len(invite_hash)})"
+    return f"{invite_hash[:4]}***{invite_hash[-4:]}(len={len(invite_hash)})"
+
+
+def _safe_link_for_log(link: str) -> str:
+    invite_hash = extract_private_invite_hash(link)
+    if invite_hash:
+        return f"private_invite:{_mask_invite_hash(invite_hash)}"
+    parsed = urlparse(link if "://" in link else f"https://{link}")
+    if parsed.netloc:
+        return f"{parsed.netloc}{parsed.path}"
+    return "unknown_link"
