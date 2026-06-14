@@ -1,18 +1,47 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${SUPABASE_DB_URL:?Set SUPABASE_DB_URL to a psql-compatible Supabase Postgres URL}"
+db_url="${SUPABASE_DB_URL:-${DATABASE_URL:-}}"
+if [[ -z "$db_url" ]]; then
+  echo "Set SUPABASE_DB_URL or DATABASE_URL to a Supabase Postgres connection string" >&2
+  exit 1
+fi
+
+db_url="${db_url/postgresql+asyncpg:/postgresql:}"
+db_url="${db_url/postgres+asyncpg:/postgres:}"
+db_url="${db_url//ssl=require/sslmode=require}"
 
 data_file="${1:-tmp/supabase_migration/post_writer_bot_data.sql}"
+counts_file="$(dirname "$data_file")/supabase_counts.txt"
+source_counts_file="$(dirname "$data_file")/source_counts.txt"
 
 if [[ ! -f "$data_file" ]]; then
   echo "Data file not found: $data_file" >&2
   exit 1
 fi
 
-psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f app/db/migrations/0001_initial.sql
-psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f "$data_file"
-psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -f app/db/migrations/0003_enable_rls.sql
+run_psql() {
+  psql "$db_url" -v ON_ERROR_STOP=1 "$@"
+}
+
+run_psql -f app/db/migrations/0001_initial.sql
+run_psql -f app/db/migrations/0004_project_menu_fields.sql
+run_psql -c "
+truncate table
+  followup_events,
+  subscriptions,
+  payments,
+  posts,
+  ideas,
+  audience_profiles,
+  projects,
+  users,
+  tariffs
+restart identity cascade;
+"
+run_psql -f "$data_file"
+run_psql -f app/db/migrations/0002_seed_tariffs.sql
+run_psql -f app/db/migrations/0003_enable_rls.sql
 
 for table_name in \
   users \
@@ -25,10 +54,10 @@ for table_name in \
   subscriptions \
   followup_events
 do
-  psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -c "vacuum analyze $table_name;"
+  run_psql -c "vacuum analyze $table_name;"
 done
 
-psql "$SUPABASE_DB_URL" -v ON_ERROR_STOP=1 -Atc "
+run_psql -Atc "
 select table_name || '=' || row_count
 from (
   select 'audience_profiles' as table_name, count(*) as row_count from audience_profiles
@@ -42,4 +71,8 @@ from (
   union all select 'users', count(*) from users
 ) counts
 order by table_name;
-"
+" | tee "$counts_file"
+
+if [[ -f "$source_counts_file" ]]; then
+  diff -u "$source_counts_file" "$counts_file"
+fi

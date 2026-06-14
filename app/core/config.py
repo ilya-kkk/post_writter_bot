@@ -4,11 +4,11 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    app_env: str = "local"
+    app_env: str = "production"
     bot_token: str = ""
-    database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/post_writer_bot"
+    database_url: str = ""
     redis_url: str = "redis://localhost:6379/0"
-    auto_init_db: bool = True
+    auto_init_db: bool = False
     openai_api_key: str = ""
     openai_base_url: str = ""
     openai_model: str = "gpt-4o-mini"
@@ -23,8 +23,8 @@ class Settings(BaseSettings):
     analyze_job_timeout_seconds: int = 360
     generate_ideas_job_timeout_seconds: int = 240
     generate_post_job_timeout_seconds: int = 360
-    followup_fast_mode: bool = True
-    mock_payments: bool = True
+    followup_fast_mode: bool = False
+    mock_payments: bool = False
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 

@@ -10,6 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
     updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 
+ALTER TABLE users ADD COLUMN IF NOT EXISTS current_project_id INTEGER;
 CREATE INDEX IF NOT EXISTS ix_users_telegram_id ON users (telegram_id);
 CREATE INDEX IF NOT EXISTS ix_users_current_project_id ON users (current_project_id);
 

@@ -7,8 +7,19 @@ from sqlalchemy.pool import NullPool
 from app.core.config import settings
 
 
+LOCAL_DATABASE_HOSTS = {"localhost", "127.0.0.1", "::1", "0.0.0.0", "db", "postgres"}
+
+
 def make_async_database_url(database_url: str) -> URL:
+    if not database_url.strip():
+        raise RuntimeError("DATABASE_URL must be set to a Supabase Postgres connection string.")
+
     url = make_url(database_url)
+    if _is_local_database_url(url):
+        raise RuntimeError("Local PostgreSQL URLs are disabled. Set DATABASE_URL to your Supabase Postgres URL.")
+    if not _is_supabase_database_url(url):
+        raise RuntimeError("DATABASE_URL must point to a Supabase Postgres host.")
+
     if url.drivername in {"postgres", "postgresql"}:
         url = url.set(drivername="postgresql+asyncpg")
 
@@ -23,9 +34,19 @@ def make_async_database_url(database_url: str) -> URL:
     return url.set(query=query)
 
 
+def _is_local_database_url(url: URL) -> bool:
+    host = (url.host or "").lower()
+    return host in LOCAL_DATABASE_HOSTS
+
+
+def _is_supabase_database_url(url: URL) -> bool:
+    host = (url.host or "").lower()
+    return host.endswith(".supabase.com") or host.endswith(".supabase.co") or host in {"supabase.com", "supabase.co"}
+
+
 def _is_supabase_transaction_pooler(url: URL) -> bool:
     host = url.host or ""
-    return (host.endswith("supabase.com") or host.endswith("supabase.co")) and url.port == 6543
+    return _is_supabase_database_url(url) and url.port == 6543
 
 
 database_url = make_async_database_url(settings.database_url)
